@@ -26,7 +26,7 @@
     #gameCanvas {
       display: block;
     }
-    /* Scoreboard (visible during play) */
+    /* Scoreboard (visible during play and displaying final score after time expires) */
     #scoreboardContainer {
       position: absolute;
       top: 60px;
@@ -144,11 +144,10 @@
     // --- Global Game Variables ---
     let score = 0;
     let kickCount = 0;
-    let goalMessage = "";
     let timeLeft = 30;
     let gameActive = true;
     
-    // Countdown timer: update scoreboard; when time expires, hide scoreboard and show New Game button.
+    // Countdown timer: update scoreboard; when time expires, show final score in the DOM.
     const timerInterval = setInterval(() => {
       if (gameActive) {
         timeLeft--;
@@ -156,7 +155,9 @@
         if (timeLeft <= 0) {
           timeLeft = 0;
           gameActive = false;
-          document.getElementById('scoreboardContainer').style.display = "none";
+          // Display final score in the scoreboard.
+          document.getElementById('scoreboardContainer').textContent = "Final Score: " + score;
+          // Show New Game button.
           document.getElementById('newGameButton').style.display = "block";
         }
       }
@@ -235,23 +236,6 @@
         context.fillText("👟", ball.position.x - 50, ball.position.y);
       }
       
-      // Optionally, also draw score and time on canvas.
-      if (gameActive) {
-        context.font = "20px sans-serif";
-        context.fillStyle = "black";
-        context.textAlign = "left";
-        context.fillText("Score: " + score, 10, 30);
-        context.font = "20px sans-serif";
-        context.fillStyle = "black";
-        context.textAlign = "right";
-        context.fillText("Time: " + timeLeft, 790, 30);
-      } else {
-        context.font = "80px sans-serif";
-        context.fillStyle = "black";
-        context.textAlign = "center";
-        context.fillText("Final Score: " + score, 400, 100);
-      }
-      
       // Draw goal posts.
       context.strokeStyle = "white";
       context.lineWidth = 5;
@@ -269,13 +253,6 @@
       context.moveTo(goal.position.x + 30, goal.position.y - 100);
       context.lineTo(goal.position.x + 30, goal.position.y + 100);
       context.stroke();
-      
-      if (goalMessage) {
-        context.font = "50px sans-serif";
-        context.fillStyle = "red";
-        context.textAlign = "center";
-        context.fillText(goalMessage, 400, 300);
-      }
     });
     
     // --- Interaction for the Kick ---
@@ -366,8 +343,6 @@
           let roundScore = 100 - ((kickCount - 1) * 10);
           if (roundScore < 0) roundScore = 0;
           score += roundScore;
-          goalMessage = "GOAL!";
-          setTimeout(() => { goalMessage = ""; }, 2000);
           resetRound();
           // Create a new obstacle at a random location.
           let newX, newY;
@@ -425,6 +400,8 @@
       timeLeft = 30;
       gameActive = true;
       resetRound();
+      // Reset scoreboard display.
+      document.getElementById('scoreboardContainer').textContent = "Score: " + score + "   Time: " + timeLeft;
     }
     
   </script>
