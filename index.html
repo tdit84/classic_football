@@ -42,6 +42,7 @@
       border: 2px solid white;
       border-radius: 8px;
       z-index: 3;
+      transition: top 0.3s ease;
     }
     /* New Game button (hidden during play) */
     #newGameButton {
@@ -147,7 +148,7 @@
     let timeLeft = 30;
     let gameActive = true;
     
-    // Countdown timer: update scoreboard; when time expires, show final score in the DOM.
+    // Countdown timer: update scoreboard; when time expires, move scoreboard down and display final score.
     const timerInterval = setInterval(() => {
       if (gameActive) {
         timeLeft--;
@@ -155,6 +156,8 @@
         if (timeLeft <= 0) {
           timeLeft = 0;
           gameActive = false;
+          // Move the scoreboard down by at least its height (from 60px to 130px)
+          document.getElementById('scoreboardContainer').style.top = "130px";
           // Display final score in the scoreboard.
           document.getElementById('scoreboardContainer').textContent = "Final Score: " + score;
           // Show New Game button.
@@ -168,7 +171,8 @@
     newGameButton.addEventListener('click', () => {
       resetGame();
       newGameButton.style.display = "none";
-      document.getElementById('scoreboardContainer').style.display = "block";
+      // Reset scoreboard position.
+      document.getElementById('scoreboardContainer').style.top = "60px";
       document.getElementById('scoreboardContainer').textContent = "Score: " + score + "   Time: " + timeLeft;
     });
     
@@ -400,8 +404,10 @@
       timeLeft = 30;
       gameActive = true;
       resetRound();
-      // Reset scoreboard display.
-      document.getElementById('scoreboardContainer').textContent = "Score: " + score + "   Time: " + timeLeft;
+      // Reset scoreboard display and position.
+      const scoreboard = document.getElementById('scoreboardContainer');
+      scoreboard.style.top = "60px";
+      scoreboard.textContent = "Score: " + score + "   Time: " + timeLeft;
     }
     
   </script>
