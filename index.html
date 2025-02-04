@@ -267,7 +267,7 @@
     canvas.addEventListener('mousedown', function(evt) {
       if (!gameActive) return;
       const pos = getCanvasPos(canvas, evt);
-      if (Math.hypot(pos.x - ball.position.x, pos.y - ball.position.y) <= ballRadius) {
+      if (Math.hypot(pos.x - ball.position.x, pos.y - ball.position.y) <= ballRadius * 9) {
         isDragging = true;
         dragStart = pos;
         dragCurrent = pos;
@@ -303,7 +303,7 @@
       evt.preventDefault();
       const touch = evt.touches[0];
       const pos = getCanvasPos(canvas, touch);
-      if (Math.hypot(pos.x - ball.position.x, pos.y - ball.position.y) <= ballRadius) {
+      if (Math.hypot(pos.x - ball.position.x, pos.y - ball.position.y) <= ballRadius * 9) {
         isDragging = true;
         dragStart = pos;
         dragCurrent = pos;
