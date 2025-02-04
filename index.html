@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <!-- Set the viewport to device dimensions -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emoji Soccer Kick Game</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      /* Allow vertical scrolling if needed */
+      overflow-y: auto;
+      background: #87CEEB;
+      height: 100%;
+      width: 100%;
+    }
+    /* Container for the canvas */
+    #gameContainer {
+      position: relative;
+      width: 100%;
+      /* Set min-height to ensure the container is at least as tall as the viewport */
+      min-height: 100vh;
+      background: #87CEEB;
+    }
+    /* The canvas has an internal resolution of 800x600;
+       its CSS size and margins will be adjusted via JavaScript. */
+    #gameCanvas {
+      display: block;
+    }
+    /* New Game button styling */
+    #newGameButton {
+      position: absolute;
+      z-index: 10;
+      display: none;
+      font-size: 24px;
+      padding: 10px 20px;
+      /* Its positioning remains relative to the container */
+    }
+  </style>
+</head>
+<body>
+  <div id="gameContainer">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <button id="newGameButton">New Game</button>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <script>
+    // --- Responsive Resize Function ---
+    // The fixed game world is 800x600.
+    // In landscape, we use the full viewport height and center the canvas horizontally.
+    // In portrait, we use the full viewport width and center vertically.
+    // The computed scale factor is stored as a data attribute on the canvas.
+    function resizeCanvas() {
+      const canvas = document.getElementById('gameCanvas');
+      const container = document.getElementById('gameContainer');
+      const winW = window.innerWidth;
+      const winH = window.innerHeight;
+      const gameW = 800, gameH = 600;
+      let scale;
+      if (winW > winH) {
+        // Landscape: use full viewport height.
+        scale = winH / gameH;
+        canvas.style.width = (gameW * scale) + "px";
+        canvas.style.height = (gameH * scale) + "px";
+        // Center horizontally.
+        canvas.style.marginLeft = ((winW - gameW * scale) / 2) + "px";
+        canvas.style.marginTop = "0px";
+        // Ensure container height is the scaled canvas height.
+        container.style.height = (gameH * scale) + "px";
+      } else {
+        // Portrait: use full viewport width.
+        scale = winW / gameW;
+        canvas.style.width = (gameW * scale) + "px";
+        canvas.style.height = (gameH * scale) + "px";
+        // Center vertically.
+        canvas.style.marginTop = ((winH - gameH * scale) / 2) + "px";
+        canvas.style.marginLeft = "0px";
+        container.style.height = winH + "px";
+      }
+      // Store the scale factor for converting event coordinates.
+      canvas.dataset.scale = scale;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    
+    // --- Adjust getCanvasPos to account for scaling ---
+    function getCanvasPos(canvas, evt) {
+      const rect = canvas.getBoundingClientRect();
+      const scale = parseFloat(canvas.dataset.scale) || 1;
+      return {
+        x: (evt.clientX - rect.left) / scale,
+        y: (evt.clientY - rect.top) / scale
+      };
+    }
+    
+    // --- Matter.js Setup ---
+    const Engine = Matter.Engine,
+          Render = Matter.Render,
+          Runner = Matter.Runner,
+          Bodies = Matter.Bodies,
+          Composite = Matter.Composite,
+          Body = Matter.Body,
+          Events = Matter.Events;
+    
+    const engine = Engine.create();
+    const world = engine.world;
+    
+    const canvas = document.getElementById('gameCanvas');
+    const render = Render.create({
+      canvas: canvas,
+      engine: engine,
+      options: {
+        width: 800,
+        height: 600,
+        wireframes: false,
+        background: '#87CEEB'
+      }
+    });
+    Render.run(render);
+    
+    const runner = Runner.create();
+    Runner.run(runner, engine);
+    
+    // --- Global Game Variables ---
+    let score = 0;
+    let kickCount = 0;
+    let goalMessage = "";
+    let timeLeft = 30;
+    let gameActive = true;
+    
+    // Countdown timer.
+    const timerInterval = setInterval(() => {
+      if (gameActive) {
+        timeLeft--;
+        if (timeLeft <= 0) {
+          timeLeft = 0;
+          gameActive = false;
+          document.getElementById('newGameButton').style.display = "block";
+        }
+      }
+    }, 1000);
+    
+    // New Game button functionality.
+    const newGameButton = document.getElementById('newGameButton');
+    newGameButton.addEventListener('click', () => {
+      resetGame();
+      newGameButton.style.display = "none";
+    });
+    
+    // --- Create the Scene ---
+    // Ground (soccer field).
+    const ground = Bodies.rectangle(400, 590, 810, 20, { 
+      isStatic: true,
+      render: { fillStyle: '#32CD32' }
+    });
+    Composite.add(world, ground);
+    
+    // Obstacles (defenders).
+    const obstacle1 = Bodies.rectangle(400, 500, 100, 20, { 
+      isStatic: true, 
+      angle: Math.PI * 0.06, 
+      render: { fillStyle: '#8B4513' },
+      isObstacle: true,
+      isOriginal: true
+    });
+    const obstacle2 = Bodies.rectangle(600, 400, 150, 20, { 
+      isStatic: true, 
+      angle: -Math.PI * 0.1, 
+      render: { fillStyle: '#8B4513' },
+      isObstacle: true,
+      isOriginal: true
+    });
+    Composite.add(world, [obstacle1, obstacle2]);
+    
+    // Goal area.
+    const goal = Bodies.rectangle(750, 500, 80, 200, { 
+      isStatic: true, 
+      isSensor: true, 
+      render: { fillStyle: 'rgba(0,0,0,0)' }
+    });
+    Composite.add(world, goal);
+    
+    // Soccer ball.
+    const ballRadius = 20;
+    const ball = Bodies.circle(150, 500, ballRadius, { 
+      restitution: 0.6, 
+      density: 0.004,
+      render: { fillStyle: '#ffffff' }
+    });
+    Composite.add(world, ball);
+    
+    // --- Custom Rendering ---
+    Events.on(render, 'afterRender', function() {
+      const context = render.context;
+      
+      // Draw the soccer ball emoji.
+      context.font = "40px serif";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText("⚽", ball.position.x, ball.position.y);
+      
+      // Draw the drag indicator if dragging.
+      if (isDragging && dragStart && dragCurrent && gameActive) {
+        context.strokeStyle = "red";
+        context.lineWidth = 3;
+        context.beginPath();
+        context.moveTo(ball.position.x, ball.position.y);
+        context.lineTo(dragCurrent.x, dragCurrent.y);
+        context.stroke();
+        context.font = "75px serif";
+        context.fillText("👟", ball.position.x - 50, ball.position.y);
+      }
+      
+      // Draw score and timer.
+      if (gameActive) {
+        context.font = "20px sans-serif";
+        context.fillStyle = "black";
+        context.textAlign = "left";
+        context.fillText("Score: " + score, 10, 30);
+        context.font = "20px sans-serif";
+        context.fillStyle = "black";
+        context.textAlign = "right";
+        context.fillText("Time: " + timeLeft, 790, 30);
+      } else {
+        context.font = "80px sans-serif";
+        context.fillStyle = "black";
+        context.textAlign = "center";
+        context.fillText("Final Score: " + score, 400, 100);
+      }
+      
+      // Draw goal posts.
+      context.strokeStyle = "white";
+      context.lineWidth = 5;
+      context.beginPath();
+      context.moveTo(goal.position.x - 30, goal.position.y - 100);
+      context.lineTo(goal.position.x + 30, goal.position.y - 100);
+      context.stroke();
+      
+      context.beginPath();
+      context.moveTo(goal.position.x - 30, goal.position.y - 100);
+      context.lineTo(goal.position.x - 30, goal.position.y + 100);
+      context.stroke();
+      
+      context.beginPath();
+      context.moveTo(goal.position.x + 30, goal.position.y - 100);
+      context.lineTo(goal.position.x + 30, goal.position.y + 100);
+      context.stroke();
+      
+      if (goalMessage) {
+        context.font = "50px sans-serif";
+        context.fillStyle = "red";
+        context.textAlign = "center";
+        context.fillText(goalMessage, 400, 300);
+      }
+    });
+    
+    // --- Interaction for the Kick ---
+    let isDragging = false;
+    let dragStart = null;
+    let dragCurrent = null;
+    
+    canvas.addEventListener('mousedown', function(evt) {
+      if (!gameActive) return;
+      const pos = getCanvasPos(canvas, evt);
+      if (Math.hypot(pos.x - ball.position.x, pos.y - ball.position.y) <= ballRadius) {
+        isDragging = true;
+        dragStart = pos;
+        dragCurrent = pos;
+      }
+    });
+    
+    canvas.addEventListener('mousemove', function(evt) {
+      if (!gameActive) return;
+      if (isDragging) {
+        dragCurrent = getCanvasPos(canvas, evt);
+      }
+    });
+    
+    canvas.addEventListener('mouseup', function(evt) {
+      if (!gameActive) return;
+      if (isDragging) {
+        isDragging = false;
+        const dragEnd = getCanvasPos(canvas, evt);
+        const forceMagnitude = 0.005;
+        const force = {
+          x: (dragStart.x - dragEnd.x) * forceMagnitude,
+          y: (dragStart.y - dragEnd.y) * forceMagnitude
+        };
+        Body.applyForce(ball, ball.position, force);
+        kickCount++;
+        dragStart = null;
+        dragCurrent = null;
+      }
+    });
+    
+    canvas.addEventListener('touchstart', function(evt) {
+      if (!gameActive) return;
+      evt.preventDefault();
+      const touch = evt.touches[0];
+      const pos = getCanvasPos(canvas, touch);
+      if (Math.hypot(pos.x - ball.position.x, pos.y - ball.position.y) <= ballRadius) {
+        isDragging = true;
+        dragStart = pos;
+        dragCurrent = pos;
+      }
+    });
+    
+    canvas.addEventListener('touchmove', function(evt) {
+      if (!gameActive) return;
+      evt.preventDefault();
+      if (isDragging) {
+        const touch = evt.touches[0];
+        dragCurrent = getCanvasPos(canvas, touch);
+      }
+    });
+    
+    canvas.addEventListener('touchend', function(evt) {
+      if (!gameActive) return;
+      evt.preventDefault();
+      if (isDragging) {
+        isDragging = false;
+        const touch = evt.changedTouches[0];
+        const dragEnd = getCanvasPos(canvas, touch);
+        const forceMagnitude = 0.005;
+        const force = {
+          x: (dragStart.x - dragEnd.x) * forceMagnitude,
+          y: (dragStart.y - dragEnd.y) * forceMagnitude
+        };
+        Body.applyForce(ball, ball.position, force);
+        kickCount++;
+        dragStart = null;
+        dragCurrent = null;
+      }
+    });
+    
+    // --- Collision Events and Reset Functions ---
+    Events.on(engine, 'collisionStart', function(event) {
+      if (!gameActive) return;
+      event.pairs.forEach(pair => {
+        if ((pair.bodyA === ball && pair.bodyB === goal) ||
+            (pair.bodyB === ball && pair.bodyA === goal)) {
+          let roundScore = 100 - ((kickCount - 1) * 10);
+          if (roundScore < 0) roundScore = 0;
+          score += roundScore;
+          goalMessage = "GOAL!";
+          setTimeout(() => { goalMessage = ""; }, 2000);
+          resetRound();
+          // Create a new obstacle at a random location.
+          let newX, newY;
+          if (Math.random() < 0.5) {
+            newX = Math.random() * (650 - 300) + 300;
+            newY = Math.random() * (580 - 550) + 550;
+          } else {
+            newX = Math.random() * (650 - 300) + 300;
+            newY = Math.random() * (400 - 200) + 200;
+          }
+          const newObstacle = Bodies.rectangle(newX, newY, 100, 20, {
+            isStatic: true,
+            angle: Math.PI * (Math.random() * 0.3 - 0.15),
+            render: { fillStyle: '#8B4513' },
+            isObstacle: true,
+            isNewObstacle: true
+          });
+          Composite.add(world, newObstacle);
+        }
+      });
+    });
+    
+    Events.on(engine, 'collisionStart', function(event) {
+      if (!gameActive) return;
+      event.pairs.forEach(pair => {
+        if ((pair.bodyA === ball && pair.bodyB.isObstacle) ||
+            (pair.bodyB === ball && pair.bodyA.isObstacle)) {
+          score = Math.max(score - 50, 0);
+        }
+      });
+    });
+    
+    Events.on(engine, 'afterUpdate', function() {
+      if (!gameActive) return;
+      if (ball.position.x < 0 || ball.position.x > render.options.width) {
+        alert("Ball went off screen. Game over.");
+        resetGame();
+      }
+    });
+    
+    function resetRound() {
+      Body.setPosition(ball, { x: 150, y: 500 });
+      Body.setVelocity(ball, { x: 0, y: 0 });
+      kickCount = 0;
+    }
+    
+    function resetGame() {
+      const allBodies = Composite.allBodies(world);
+      allBodies.forEach(body => {
+        if (!body.isOriginal && body.isObstacle) {
+          Composite.remove(world, body);
+        }
+      });
+      score = 0;
+      timeLeft = 30;
+      gameActive = true;
+      resetRound();
+    }
+    
+  </script>
+</body>
+</html>
