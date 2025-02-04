@@ -9,48 +9,70 @@
     html, body {
       margin: 0;
       padding: 0;
-      /* Allow vertical scrolling if needed */
       overflow-y: auto;
       background: #87CEEB;
       height: 100%;
       width: 100%;
+      font-family: sans-serif;
     }
-    /* Container for the canvas */
+    /* Container for the canvas and overlays */
     #gameContainer {
       position: relative;
       width: 100%;
-      /* Set min-height to ensure the container is at least as tall as the viewport */
       min-height: 100vh;
       background: #87CEEB;
     }
-    /* The canvas has an internal resolution of 800x600;
-       its CSS size and margins will be adjusted via JavaScript. */
+    /* The canvas itself */
     #gameCanvas {
       display: block;
     }
-    /* New Game button styling */
+    /* Scoreboard (visible during play) */
+    #scoreboardContainer {
+      position: absolute;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 400px;
+      height: 60px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      font-size: 32px;
+      line-height: 60px;
+      text-align: center;
+      border: 2px solid white;
+      border-radius: 8px;
+      z-index: 3;
+    }
+    /* New Game button (hidden during play) */
     #newGameButton {
       position: absolute;
-      z-index: 10;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 400px;
+      height: 60px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      font-size: 32px;
+      line-height: 60px;
+      text-align: center;
+      border: 2px solid white;
+      border-radius: 8px;
+      cursor: pointer;
+      z-index: 4;
       display: none;
-      font-size: 24px;
-      padding: 10px 20px;
-      /* Its positioning remains relative to the container */
     }
   </style>
 </head>
 <body>
   <div id="gameContainer">
     <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="scoreboardContainer">Score: 0   Time: 30</div>
     <button id="newGameButton">New Game</button>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
   <script>
     // --- Responsive Resize Function ---
-    // The fixed game world is 800x600.
-    // In landscape, we use the full viewport height and center the canvas horizontally.
-    // In portrait, we use the full viewport width and center vertically.
-    // The computed scale factor is stored as a data attribute on the canvas.
     function resizeCanvas() {
       const canvas = document.getElementById('gameCanvas');
       const container = document.getElementById('gameContainer');
@@ -63,17 +85,14 @@
         scale = winH / gameH;
         canvas.style.width = (gameW * scale) + "px";
         canvas.style.height = (gameH * scale) + "px";
-        // Center horizontally.
         canvas.style.marginLeft = ((winW - gameW * scale) / 2) + "px";
         canvas.style.marginTop = "0px";
-        // Ensure container height is the scaled canvas height.
         container.style.height = (gameH * scale) + "px";
       } else {
         // Portrait: use full viewport width.
         scale = winW / gameW;
         canvas.style.width = (gameW * scale) + "px";
         canvas.style.height = (gameH * scale) + "px";
-        // Center vertically.
         canvas.style.marginTop = ((winH - gameH * scale) / 2) + "px";
         canvas.style.marginLeft = "0px";
         container.style.height = winH + "px";
@@ -84,7 +103,7 @@
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
     
-    // --- Adjust getCanvasPos to account for scaling ---
+    // Adjust getCanvasPos to account for scaling.
     function getCanvasPos(canvas, evt) {
       const rect = canvas.getBoundingClientRect();
       const scale = parseFloat(canvas.dataset.scale) || 1;
@@ -129,13 +148,15 @@
     let timeLeft = 30;
     let gameActive = true;
     
-    // Countdown timer.
+    // Countdown timer: update scoreboard; when time expires, hide scoreboard and show New Game button.
     const timerInterval = setInterval(() => {
       if (gameActive) {
         timeLeft--;
+        document.getElementById('scoreboardContainer').textContent = "Score: " + score + "   Time: " + timeLeft;
         if (timeLeft <= 0) {
           timeLeft = 0;
           gameActive = false;
+          document.getElementById('scoreboardContainer').style.display = "none";
           document.getElementById('newGameButton').style.display = "block";
         }
       }
@@ -146,6 +167,8 @@
     newGameButton.addEventListener('click', () => {
       resetGame();
       newGameButton.style.display = "none";
+      document.getElementById('scoreboardContainer').style.display = "block";
+      document.getElementById('scoreboardContainer').textContent = "Score: " + score + "   Time: " + timeLeft;
     });
     
     // --- Create the Scene ---
@@ -212,7 +235,7 @@
         context.fillText("👟", ball.position.x - 50, ball.position.y);
       }
       
-      // Draw score and timer.
+      // Optionally, also draw score and time on canvas.
       if (gameActive) {
         context.font = "20px sans-serif";
         context.fillStyle = "black";
