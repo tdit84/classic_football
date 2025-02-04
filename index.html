@@ -4,6 +4,14 @@
   <meta charset="utf-8">
   <!-- Set the viewport to device dimensions -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Open Graph Meta Tags for shareable image -->
+  <meta property="og:title" content="Emoji Soccer Kick Game">
+  <meta property="og:description" content="Play Emoji Soccer Kick Game!">
+  <meta property="og:image" content="https://{username}.github.io/{repo}/Classic_football_website_image.png">
+  <meta property="og:url" content="https://{username}.github.io/{repo}/">
+  <meta property="og:type" content="website">
+  
   <title>Emoji Soccer Kick Game</title>
   <style>
     html, body {
@@ -364,6 +372,7 @@
             isObstacle: true,
             isNewObstacle: true
           });
+          newObstacle.symbol = (Math.random() < 0.5) ? "X" : "O";
           Composite.add(world, newObstacle);
         }
       });
@@ -404,10 +413,6 @@
       timeLeft = 30;
       gameActive = true;
       resetRound();
-      // Reset scoreboard display and position.
-      const scoreboard = document.getElementById('scoreboardContainer');
-      scoreboard.style.top = "60px";
-      scoreboard.textContent = "Score: " + score + "   Time: " + timeLeft;
     }
     
   </script>
